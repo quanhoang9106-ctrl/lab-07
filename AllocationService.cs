@@ -12,42 +12,26 @@ public class AllocationService<T> where T : TeachingDevice
         IRepository<T> repository,
         ISelectionStrategy<T> strategy)
     {
-        if (repository == null)
-        {
-            throw new ArgumentNullException(nameof(repository));
-        }
+        this.repository = repository
+            ?? throw new ArgumentNullException(nameof(repository));
 
-        if (strategy == null)
-        {
-            throw new ArgumentNullException(nameof(strategy));
-        }
-
-        this.repository = repository;
-        this.strategy = strategy;
+        this.strategy = strategy
+            ?? throw new ArgumentNullException(nameof(strategy));
     }
 
-    // Cho phep thay doi chien luoc khi dang chay
     public void ChangeStrategy(ISelectionStrategy<T> newStrategy)
     {
-        if (newStrategy == null)
-        {
-            throw new ArgumentNullException(nameof(newStrategy));
-        }
-
-        strategy = newStrategy;
+        strategy = newStrategy
+            ?? throw new ArgumentNullException(nameof(newStrategy));
     }
 
     public T Allocate(Predicate<T>? additionalCondition = null)
     {
-        // Loc cac thiet bi san sang va thoa man dieu kien
-        IReadOnlyList<T> candidates = repository.FindAll(device =>
+        var candidates = repository.FindAll(device =>
             device.IsReadyForUse() &&
             (additionalCondition == null || additionalCondition(device)));
 
-        // Chon thiet bi theo chien luoc hien tai
         T selected = strategy.Select(candidates);
-
-        // Chuyen trang thai sang Borrowed
         selected.Borrow();
 
         return selected;

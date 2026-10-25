@@ -4,7 +4,6 @@ using System.Collections.Generic;
 
 namespace LabW07;
 
-// Interface quan ly kho luu tru
 public interface IRepository<T> where T : IIdentifiable
 {
     void Add(T item);
@@ -14,76 +13,65 @@ public interface IRepository<T> where T : IIdentifiable
     IReadOnlyList<T> FindAll(Predicate<T> condition);
 }
 
-// Kho luu tru su dung List
 public class InMemoryRepository<T> : IRepository<T>
     where T : IIdentifiable
 {
-    private readonly List<T> items = new List<T>();
+    // Luu thiet bi theo thu tu them
+    private readonly LinkedList<T> items = new();
+
+    // Tra cuu nhanh theo ID
+    private readonly Dictionary<string, LinkedListNode<T>> byId =
+        new(StringComparer.Ordinal);
 
     public void Add(T item)
     {
-        if (item is null)
-        {
-            throw new ArgumentNullException(nameof(item));
-        }
+        ArgumentNullException.ThrowIfNull(item);
 
-        if (FindById(item.Id) != null)
-        {
+        if (string.IsNullOrWhiteSpace(item.Id))
+            throw new ArgumentException("Ma thiet bi khong hop le.");
+
+        if (byId.ContainsKey(item.Id))
             throw new DuplicateIdException(item.Id);
-        }
 
-        items.Add(item);
+        LinkedListNode<T> node = items.AddLast(item);
+        byId.Add(item.Id, node);
     }
 
     public bool Remove(string id)
     {
-        for (int i = 0; i < items.Count; i++)
-        {
-            if (items[i].Id == id)
-            {
-                items.RemoveAt(i);
-                return true;
-            }
-        }
+        if (string.IsNullOrWhiteSpace(id) ||
+            !byId.TryGetValue(id, out var node))
+            return false;
 
-        return false;
+        items.Remove(node);
+        byId.Remove(id);
+
+        return true;
     }
 
     public T? FindById(string id)
     {
-        foreach (T item in items)
-        {
-            if (item.Id == id)
-            {
-                return item;
-            }
-        }
+        if (string.IsNullOrWhiteSpace(id))
+            return default;
 
-        return default;
+        return byId.TryGetValue(id, out var node)
+            ? node.Value
+            : default;
     }
 
-    public IReadOnlyList<T> GetAll()
-    {
-        // Tao ban sao de khong sua truc tiep danh sach goc
-        List<T> result = new List<T>(items);
-        return result.AsReadOnly();
-    }
+    public IReadOnlyList<T> GetAll() =>
+        new List<T>(items).AsReadOnly();
 
     public IReadOnlyList<T> FindAll(Predicate<T> condition)
     {
-        if (condition == null)
-        {
-            throw new ArgumentNullException(nameof(condition));
-        }
+        ArgumentNullException.ThrowIfNull(condition);
 
-        List<T> result = new List<T>();
+        var result = new List<T>();
 
         foreach (T item in items)
         {
             if (condition(item))
-            {
                 result.Add(item);
-            }
         }
 
         return result.AsReadOnly();

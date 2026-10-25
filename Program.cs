@@ -6,13 +6,15 @@ namespace LabW07;
 
 internal class Program
 {
-    static void Main(string[] args)
+    private static int total = 0;
+    private static int passed = 0;
+
+    static void Main()
     {
         Console.OutputEncoding = Encoding.UTF8;
+        Console.WriteLine("=== LAB W07 - QUAN LY THIET BI ===");
 
-        Console.WriteLine("LAB W07 - QUAN LY THIET BI PHONG HOC");
-
-        // Tao ba kho luu tru
+        // Kho luu tru cho 3 loai thiet bi
         IRepository<ProjectorRemote> projectorRepo =
             new InMemoryRepository<ProjectorRemote>();
 
@@ -22,280 +24,202 @@ internal class Program
         IRepository<WirelessMicrophone> micRepo =
             new InMemoryRepository<WirelessMicrophone>();
 
-        // TEST 1: Them thiet bi
-        PrintTitle("1. Them thiet bi vao repository");
-
+        // 1. Tao va them thiet bi
         projectorRepo.Add(new ProjectorRemote(
             "P01", "May chieu 1", "Kho A", 50));
-
         projectorRepo.Add(new ProjectorRemote(
             "P02", "May chieu 2", "Kho A", 20));
-
         projectorRepo.Add(new ProjectorRemote(
             "P03", "May chieu 3", "Kho B", 90));
 
         airRepo.Add(new AirConditionerRemote(
             "A01", "Dieu hoa 1", "Kho B",
             new[] { "A203", "A204" }));
-
         airRepo.Add(new AirConditionerRemote(
             "A02", "Dieu hoa 2", "Kho B",
             new[] { "B101", "B102" }));
 
         micRepo.Add(new WirelessMicrophone(
             "M01", "Micro 1", "Kho C", 30, 40));
-
         micRepo.Add(new WirelessMicrophone(
             "M02", "Micro 2", "Kho C", 75, 60));
-
         micRepo.Add(new WirelessMicrophone(
             "M03", "Micro 3", "Kho C", 55, 72));
 
-        int total = projectorRepo.GetAll().Count
-                  + airRepo.GetAll().Count
-                  + micRepo.GetAll().Count;
+        Check("1. Them du 8 thiet bi",
+            projectorRepo.GetAll().Count +
+            airRepo.GetAll().Count +
+            micRepo.GetAll().Count == 8);
 
-        PrintCheck("Da them du 8 thiet bi", total == 8);
+        // 2. Kiem tra trung ID
+        Check("2. Phat hien ID trung",
+            Throws<DuplicateIdException>(() =>
+                projectorRepo.Add(new ProjectorRemote(
+                    "P01", "May chieu khac", "Kho A", 80))));
 
-        // TEST 2: Trung ma thiet bi
-        PrintTitle("2. Kiem tra trung ID");
+        // 3. Tim kiem theo ID
+        Check("3. Tim thiet bi P02",
+            projectorRepo.FindById("P02")?.BatteryLevel == 20);
 
-        bool duplicateCaught = false;
+        // 4. Loc thiet bi san sang
+        Check("4. Loc may chieu san sang",
+            projectorRepo.FindAll(p => p.IsReadyForUse()).Count == 3);
 
-        try
-        {
-            projectorRepo.Add(new ProjectorRemote(
-                "P01", "May chieu khac", "Kho A", 80));
-        }
-        catch (DuplicateIdException ex)
-        {
-            duplicateCaught = true;
-            Console.WriteLine(ex.Message);
-        }
-
-        PrintCheck("Phat hien ID trung", duplicateCaught);
-
-        // TEST 3: Tim thiet bi theo ma
-        PrintTitle("3. Tim kiem thiet bi");
-
-        ProjectorRemote? found = projectorRepo.FindById("P02");
-
-        if (found != null)
-        {
-            Console.WriteLine(found);
-        }
-
-        PrintCheck("Tim thay P02", found != null && found.Id == "P02");
-        PrintCheck("Ma khong ton tai tra ve null",
-            projectorRepo.FindById("P99") == null);
-
-        // TEST 4: Loc thiet bi san sang
-        PrintTitle("4. Loc cac may chieu san sang");
-
-        var readyProjectors =
-            projectorRepo.FindAll(p => p.IsReadyForUse());
-
-        foreach (ProjectorRemote p in readyProjectors)
-        {
-            Console.WriteLine($"{p.Id} - Pin: {p.BatteryLevel}%");
-        }
-
-        PrintCheck("Co 3 may chieu san sang",
-            readyProjectors.Count == 3);
-
-        // TEST 5: Chon may chieu diem cao nhat
-        PrintTitle("5. Chon may chieu co diem cao nhat");
-
-        var projectorStrategy =
+        // 5. Chon may chieu co diem cao nhat
+        var projectorService = new AllocationService<ProjectorRemote>(
+            projectorRepo,
             new HighestPriorityStrategy<ProjectorRemote>(
-                p => p.GetDefaultPriorityScore());
+                p => p.GetDefaultPriorityScore()));
 
-        var projectorService =
-            new AllocationService<ProjectorRemote>(
-                projectorRepo, projectorStrategy);
+        ProjectorRemote selectedProjector = projectorService.Allocate();
 
-        ProjectorRemote selectedProjector =
-            projectorService.Allocate(p => true);
-
-        Console.WriteLine($"Da chon: {selectedProjector.Id}");
-
-        PrintCheck("May chieu duoc chon la P03",
+        Check("5. Chon may chieu pin cao nhat",
             selectedProjector.Id == "P03");
 
-        // TEST 6: Chon dieu hoa theo phong
-        PrintTitle("6. Chon dieu hoa cho phong A203");
-
-        var airStrategy =
+        // 6. Chon dieu hoa phu hop phong A203
+        var airService = new AllocationService<AirConditionerRemote>(
+            airRepo,
             new HighestPriorityStrategy<AirConditionerRemote>(
-                a => a.GetDefaultPriorityScore());
-
-        var airService =
-            new AllocationService<AirConditionerRemote>(
-                airRepo, airStrategy);
+                a => a.GetDefaultPriorityScore()));
 
         AirConditionerRemote selectedAir =
             airService.Allocate(a => a.IsCompatibleWith("A203"));
 
-        Console.WriteLine($"Da chon: {selectedAir.Id}");
-
-        PrintCheck("Dieu hoa tuong thich phong A203",
+        Check("6. Chon dieu hoa cho A203",
             selectedAir.Id == "A01");
 
-        // TEST 7: Chon micro dau tien san sang
-        PrintTitle("7. Chon micro dau tien san sang");
+        // 7. Chon micro dau tien san sang
+        var micService = new AllocationService<WirelessMicrophone>(
+            micRepo,
+            new FirstAvailableStrategy<WirelessMicrophone>());
 
-        var micStrategy =
-            new FirstAvailableStrategy<WirelessMicrophone>();
+        WirelessMicrophone selectedMic = micService.Allocate();
 
-        var micService =
-            new AllocationService<WirelessMicrophone>(
-                micRepo, micStrategy);
-
-        WirelessMicrophone selectedMic =
-            micService.Allocate(m => true);
-
-        Console.WriteLine($"Da chon: {selectedMic.Id}");
-
-        PrintCheck("Micro dau tien la M01",
+        Check("7. Chon micro dau tien",
             selectedMic.Id == "M01");
 
-        // TEST 8: Thay doi strategy
-        PrintTitle("8. Thay doi chien luoc");
-
+        // 8. Thay doi chien luoc tai runtime
         selectedProjector.Return();
 
         projectorService.ChangeStrategy(
             new FirstAvailableStrategy<ProjectorRemote>());
 
-        ProjectorRemote selectedAfterChange =
-            projectorService.Allocate(p => true);
+        ProjectorRemote firstProjector = projectorService.Allocate();
 
-        Console.WriteLine(
-            $"Sau khi doi strategy: {selectedAfterChange.Id}");
+        Check("8. Doi strategy thanh cong",
+            firstProjector.Id == "P01");
 
-        PrintCheck("Chien luoc moi chon P01",
-            selectedAfterChange.Id == "P01");
+        // 9. Khong co ung vien phu hop
+        Check("9. Phat hien khong co thiet bi",
+            Throws<NoSuitableItemException>(() =>
+                airService.Allocate(a => a.IsCompatibleWith("C999"))));
 
-        // TEST 9: Khong co thiet bi phu hop
-        PrintTitle("9. Khong tim thay thiet bi phu hop");
+        // 10. Muon va tra thiet bi
+        bool borrowed = firstProjector.Status == DeviceStatus.Borrowed;
 
-        bool noItemCaught = false;
+        firstProjector.Return();
 
-        try
-        {
-            airService.Allocate(
-                a => a.IsCompatibleWith("C999"));
-        }
-        catch (NoSuitableItemException ex)
-        {
-            noItemCaught = true;
-            Console.WriteLine(ex.Message);
-        }
+        Check("10. Borrow va Return dung",
+            borrowed &&
+            firstProjector.Status == DeviceStatus.Available);
 
-        PrintCheck("Bat loi khi khong co ung vien",
-            noItemCaught);
+        // 11. Generic repository dung cho nhieu loai
+        Check("11. Repository hoat dong voi 3 loai",
+            projectorRepo.GetAll().Count == 3 &&
+            airRepo.GetAll().Count == 2 &&
+            micRepo.GetAll().Count == 3);
 
-        // TEST 10: Kiem tra Borrow va Return
-        PrintTitle("10. Kiem tra trang thai thiet bi");
+        // Kiem tra them cac truong hop bien
+        Console.WriteLine("\n=== KIEM TRA BO SUNG ===");
 
-        Console.WriteLine(
-            $"Truoc khi tra: {selectedAfterChange.Status}");
+        Check("May chieu pin 20% san sang",
+            projectorRepo.FindById("P02")!.IsReadyForUse());
 
-        PrintCheck("Trang thai da chuyen sang Borrowed",
-            selectedAfterChange.Status == DeviceStatus.Borrowed);
+        var boundaryMic = new WirelessMicrophone(
+            "TEST01", "Test Micro", "Kho C", 30, 40);
 
-        selectedAfterChange.Return();
+        Check("Micro pin 30%, tin hieu 40% san sang",
+            boundaryMic.IsReadyForUse());
 
-        Console.WriteLine(
-            $"Sau khi tra: {selectedAfterChange.Status}");
+        Check("Diem micro M03 bang 63.5",
+            micRepo.FindById("M03")!.GetDefaultPriorityScore() == 63.5);
 
-        PrintCheck("Trang thai tro ve Available",
-            selectedAfterChange.Status == DeviceStatus.Available);
+        Check("Khong cho muon thiet bi pin yeu",
+            Throws<DeviceNotReadyException>(() =>
+                new ProjectorRemote(
+                    "TEST02", "Pin yeu", "Kho A", 10).Borrow()));
 
-        // TEST 11: Kiem tra generic repository
-        PrintTitle("11. Kiem tra generic repository");
+        Check("Khong cho muon thiet bi hai lan",
+            Throws<DeviceNotReadyException>(() => selectedAir.Borrow()));
 
-        Console.WriteLine(
-            $"Projector repository: {projectorRepo.GetAll().Count}");
+        Check("Khong cho tra thiet bi chua muon",
+            Throws<InvalidOperationException>(() =>
+                new ProjectorRemote(
+                    "TEST03", "Thiet bi moi", "Kho A", 50).Return()));
 
-        Console.WriteLine(
-            $"Air repository: {airRepo.GetAll().Count}");
+        Check("Xu ly gia tri pin khong hop le",
+            Throws<ArgumentOutOfRangeException>(() =>
+                new ProjectorRemote(
+                    "TEST04", "Pin sai", "Kho A", 101)));
 
-        Console.WriteLine(
-            $"Micro repository: {micRepo.GetAll().Count}");
+        Check("Tim ID khong ton tai tra null",
+            projectorRepo.FindById("P99") == null);
 
-        PrintCheck("Cung repository dung cho 3 loai",
-            projectorRepo.GetAll().Count == 3
-            && airRepo.GetAll().Count == 2
-            && micRepo.GetAll().Count == 3);
+        Check("Dieu hoa khong phan biet chu hoa",
+            selectedAir.IsCompatibleWith("a203"));
 
-        // KIEM TRA THEM CAC TRUONG HOP BIEN
-        PrintTitle("12. Kiem tra logic o cac nguong");
+        Check("Strategy khong chap nhan danh sach rong",
+            Throws<NoSuitableItemException>(() =>
+                new FirstAvailableStrategy<WirelessMicrophone>()
+                    .Select(Array.Empty<WirelessMicrophone>())));
 
-        // Tao doi tuong rieng de khong bi anh huong
-        // boi trang thai muon thiet bi o cac test tren
-        ProjectorRemote testProjector =
-            new ProjectorRemote("P20", "Test pin 20", "Kho A", 20);
+        // Kiem tra tinh an toan cua repository
+        var snapshot = projectorRepo.GetAll();
+        bool removed = projectorRepo.Remove("P02");
 
-        WirelessMicrophone testMic =
-            new WirelessMicrophone("M40", "Test micro", "Kho C", 30, 40);
+        Check("Xoa thiet bi theo ID",
+            removed && projectorRepo.FindById("P02") == null);
 
-        WirelessMicrophone scoreMic =
-            new WirelessMicrophone("M55", "Test diem", "Kho C", 55, 72);
+        Check("GetAll khong lo collection noi bo",
+            snapshot.Count == 3 &&
+            projectorRepo.GetAll().Count == 2);
 
-        PrintCheck("May chieu pin 20% san sang",
-            testProjector.IsReadyForUse());
+        Check("Remove tra false neu ID khong ton tai",
+            !projectorRepo.Remove("P99"));
 
-        PrintCheck("Micro pin 30%, tin hieu 40% san sang",
-            testMic.IsReadyForUse());
+        Check("ChangeStrategy khong nhan null",
+            Throws<ArgumentNullException>(() =>
+                projectorService.ChangeStrategy(null!)));
 
-        PrintCheck("Diem uu tien micro bang 63.5",
-            Math.Abs(scoreMic.GetDefaultPriorityScore() - 63.5) < 0.0001);
+        Console.WriteLine("\n==============================");
+        Console.WriteLine($"KET QUA: {passed}/{total} TEST PASS");
+        Console.WriteLine("==============================");
 
-        // Kiem tra muon thiet bi khong du dieu kien
-        bool notReadyCaught = false;
-
-        ProjectorRemote lowBattery =
-            new ProjectorRemote("P10", "May chieu pin yeu", "Kho A", 10);
-
-        try
-        {
-            lowBattery.Borrow();
-        }
-        catch (DeviceNotReadyException ex)
-        {
-            notReadyCaught = true;
-            Console.WriteLine(ex.Message);
-        }
-
-        PrintCheck("Khong cho muon thiet bi pin yeu",
-            notReadyCaught);
-
-        // Kiem tra xoa ma khong ton tai
-        PrintCheck("Remove tra false khi khong tim thay",
-            projectorRepo.Remove("P99") == false);
-
-        Console.WriteLine();
-        Console.WriteLine("HOAN THANH KIEM THU LAB W07");
+        Environment.ExitCode = passed == total ? 0 : 1;
     }
 
-    static void PrintTitle(string title)
+    static void Check(string message, bool condition)
     {
-        Console.WriteLine();
-        Console.WriteLine("-----------------------------------");
-        Console.WriteLine(title);
-        Console.WriteLine("-----------------------------------");
+        total++;
+
+        if (condition)
+            passed++;
+
+        Console.WriteLine(
+            $"[{(condition ? "PASS" : "FAIL")}] {message}");
     }
 
-    static void PrintCheck(string message, bool result)
+    static bool Throws<TException>(Action action)
+        where TException : Exception
     {
-        if (result)
+        try
         {
-            Console.WriteLine("[PASS] " + message);
+            action();
+            return false;
         }
-        else
+        catch (TException)
         {
-            Console.WriteLine("[FAIL] " + message);
+            return true;
         }
     }
 }

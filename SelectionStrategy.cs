@@ -9,44 +9,34 @@ public interface ISelectionStrategy<T>
     T Select(IReadOnlyList<T> candidates);
 }
 
-// Chon thiet bi co diem uu tien cao nhat
 public class HighestPriorityStrategy<T> : ISelectionStrategy<T>
 {
     private readonly Func<T, double> scoreSelector;
 
     public HighestPriorityStrategy(Func<T, double> scoreSelector)
     {
-        if (scoreSelector == null)
-        {
-            throw new ArgumentNullException(nameof(scoreSelector));
-        }
-
-        this.scoreSelector = scoreSelector;
+        this.scoreSelector = scoreSelector
+            ?? throw new ArgumentNullException(nameof(scoreSelector));
     }
 
     public T Select(IReadOnlyList<T> candidates)
     {
-        if (candidates == null)
-        {
-            throw new ArgumentNullException(nameof(candidates));
-        }
+        ArgumentNullException.ThrowIfNull(candidates);
 
         if (candidates.Count == 0)
-        {
             throw new NoSuitableItemException();
-        }
 
         T best = candidates[0];
-        double bestScore = scoreSelector(best);
+        double maxScore = scoreSelector(best);
 
         for (int i = 1; i < candidates.Count; i++)
         {
             double score = scoreSelector(candidates[i]);
 
-            if (score > bestScore)
+            if (score > maxScore)
             {
+                maxScore = score;
                 best = candidates[i];
-                bestScore = score;
             }
         }
 
@@ -54,20 +44,14 @@ public class HighestPriorityStrategy<T> : ISelectionStrategy<T>
     }
 }
 
-// Chon ung vien dau tien trong danh sach
 public class FirstAvailableStrategy<T> : ISelectionStrategy<T>
 {
     public T Select(IReadOnlyList<T> candidates)
     {
-        if (candidates == null)
-        {
-            throw new ArgumentNullException(nameof(candidates));
-        }
+        ArgumentNullException.ThrowIfNull(candidates);
 
         if (candidates.Count == 0)
-        {
             throw new NoSuitableItemException();
-        }
 
         return candidates[0];
     }
