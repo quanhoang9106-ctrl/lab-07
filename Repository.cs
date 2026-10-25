@@ -1,8 +1,10 @@
+
 using System;
 using System.Collections.Generic;
 
 namespace LabW07;
 
+// Interface quan ly kho luu tru
 public interface IRepository<T> where T : IIdentifiable
 {
     void Add(T item);
@@ -12,17 +14,23 @@ public interface IRepository<T> where T : IIdentifiable
     IReadOnlyList<T> FindAll(Predicate<T> condition);
 }
 
-public class InMemoryRepository<T> : IRepository<T> where T : IIdentifiable
+// Kho luu tru su dung List
+public class InMemoryRepository<T> : IRepository<T>
+    where T : IIdentifiable
 {
     private readonly List<T> items = new List<T>();
 
     public void Add(T item)
     {
         if (item is null)
+        {
             throw new ArgumentNullException(nameof(item));
+        }
 
-        if (FindById(item.Id) is not null)
+        if (FindById(item.Id) != null)
+        {
             throw new DuplicateIdException(item.Id);
+        }
 
         items.Add(item);
     }
@@ -37,6 +45,7 @@ public class InMemoryRepository<T> : IRepository<T> where T : IIdentifiable
                 return true;
             }
         }
+
         return false;
     }
 
@@ -45,28 +54,38 @@ public class InMemoryRepository<T> : IRepository<T> where T : IIdentifiable
         foreach (T item in items)
         {
             if (item.Id == id)
+            {
                 return item;
+            }
         }
+
         return default;
     }
 
     public IReadOnlyList<T> GetAll()
     {
-        // Tra ve ban sao, khong cho ben ngoai sua list goc.
-        return new List<T>(items).AsReadOnly();
+        // Tao ban sao de khong sua truc tiep danh sach goc
+        List<T> result = new List<T>(items);
+        return result.AsReadOnly();
     }
 
     public IReadOnlyList<T> FindAll(Predicate<T> condition)
     {
         if (condition == null)
+        {
             throw new ArgumentNullException(nameof(condition));
+        }
 
         List<T> result = new List<T>();
+
         foreach (T item in items)
         {
             if (condition(item))
+            {
                 result.Add(item);
+            }
         }
+
         return result.AsReadOnly();
     }
 }
